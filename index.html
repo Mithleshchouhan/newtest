@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cast to TV</title>
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+        #status {
+            margin-top: 20px;
+        }
+        #downloadLink {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Cast Local Video to TV</h1>
+
+    <input type="file" id="videoFile" accept="video/*" />
+    <button id="castButton" disabled>Cast to TV</button>
+    <p id="status">Please upload a video and select a device to cast.</p>
+
+    <script>
+        let fileUrl = '';
+        let castSession = null;
+
+        // Initialize the Cast API
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable) {
+                initializeCast();
+            }
+        };
+
+        function initializeCast() {
+            cast.framework.CastContext.getInstance().setOptions({
+                receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+                autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+            });
+
+            document.getElementById('castButton').disabled = false;
+
+            // Listen for cast state changes
+            cast.framework.CastContext.getInstance().addEventListener('sessionStateChanged', (event) => {
+                castSession = event.sessionState === 'SESSION_ENDED' ? null : event.castSession;
+                updateUI();
+            });
+        }
+
+        // File input change event to create a local URL for the video file
+        document.getElementById('videoFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                fileUrl = URL.createObjectURL(file); // Create a blob URL for the local file
+                console.log('File selected:', fileUrl);
+            }
+        });
+
+        // Cast button event to cast the local file
+        document.getElementById('castButton').addEventListener('click', function() {
+            if (!fileUrl) {
+                alert('Please select a video file first.');
+                return;
+            }
+
+            castSession = cast.framework.CastContext.getInstance().getCurrentSession();
+            if (castSession) {
+                const mediaInfo = new chrome.cast.media.MediaInfo(fileUrl, 'video/mp4');
+                mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+                mediaInfo.metadata.title = "Local Video";
+                mediaInfo.metadata.images = [{url: 'https://via.placeholder.com/150'}]; // Placeholder for thumbnail
+
+                const request = new chrome.cast.media.LoadRequest(mediaInfo);
+                castSession.loadMedia(request).then(
+                    function() { console.log('Load succeed'); updateUI(); },
+                    function(errorCode) { console.log('Error code: ' + errorCode); }
+                );
+            }
+        });
+
+        function updateUI() {
+            const status = document.getElementById('status');
+            if (castSession) {
+                status.textContent = 'Casting...';
+            } else {
+                status.textContent = 'Please upload a video and select a device to cast.';
+            }
+        }
+    </script>
+</body>
+</html>
